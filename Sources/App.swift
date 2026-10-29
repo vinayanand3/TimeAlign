@@ -100,12 +100,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         panel = FloatingPanel(
             contentRect: NSRect(x: 0, y: 0, width: 460, height: 655),
-            styleMask: [.titled, .closable, .resizable, .fullSizeContentView, .nonactivatingPanel],
+            // Borderless: RootView draws the rounded glass itself, so there is no system frame
+            // (a transparent titled window still drew its border and a band along the top).
+            styleMask: [.borderless, .resizable, .nonactivatingPanel],
             backing: .buffered, defer: false)
-        panel.titleVisibility = .hidden
-        panel.titlebarAppearsTransparent = true
-        panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
-        panel.standardWindowButton(.zoomButton)?.isHidden = true
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = false   // the system shadow is a rectangle around the clear window; the glass casts its own
         // Not movable by background: that hijacks the day-track drags. The header is the handle.
         panel.isMovableByWindowBackground = false
         panel.hidesOnDeactivate = false
@@ -116,7 +117,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         panel.delegate = self
         panelState.panel = panel
 
-        panel.standardWindowButton(.closeButton)?.isHidden = true
         // Assigning the hosting controller leaves the panel 0x0 (its view has no frame yet).
         // Give it a real size first so a fresh launch doesn't start as a sliver.
         panel.setContentSize(NSSize(width: 460, height: 655))

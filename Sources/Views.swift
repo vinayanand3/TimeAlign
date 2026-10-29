@@ -2,8 +2,6 @@ import SwiftUI
 import AppKit
 
 enum Palette {
-    static let night = Color(red: 0.24, green: 0.36, blue: 0.56)
-    static let day = Color(red: 0.90, green: 0.82, blue: 0.58)
     static let accent = Color(red: 0.07, green: 0.42, blue: 0.75)
 }
 
@@ -19,19 +17,19 @@ struct RootView: View {
         VStack(spacing: 0) {
             header
             controls
-            Divider()
-            if showBest { bestBanner; Divider() }
+            if showBest { bestBanner }
             ScrollView(.vertical) {
-                VStack(spacing: 0) {
+                VStack(spacing: 8) {
                     ForEach(store.places) { p in
                         PlaceRow(place: p, isHome: p.id == store.places.first?.id)
-                        Divider()
                     }
                 }
+                .padding(.horizontal, 10).padding(.vertical, 10)
                 // Measured into @State: a preference set inside a macOS ScrollView doesn't reach outside it.
                 .background(GeometryReader { g in Color.clear.onAppear { rowsHeight = g.size.height }
                     .onChange(of: g.size.height) { rowsHeight = $0 } })
             }
+            .scrollIndicators(.never)   // a legacy scroller paints an opaque strip over the glass
             .background(GeometryReader { g in Color.clear.onAppear { viewportHeight = g.size.height }
                 .onChange(of: g.size.height) { viewportHeight = $0 } })
             TimestampBar()
@@ -40,7 +38,7 @@ struct RootView: View {
         .frame(minWidth: 380, maxWidth: .infinity, maxHeight: .infinity)
         .background(GeometryReader { g in Color.clear.onAppear { rootHeight = g.size.height }
             .onChange(of: g.size.height) { rootHeight = $0 } })
-        .background(.regularMaterial)
+        .glass(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay(alignment: .top) { searchResults }
         .onChange(of: rowsHeight) { rows in
             // Next runloop turn, so the root and viewport heights from this layout pass are in.
@@ -95,8 +93,8 @@ struct RootView: View {
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
-            .frame(width: 30, height: 26)
-            .background(RoundedRectangle(cornerRadius: 7).stroke(Color.secondary.opacity(0.35)))
+            .frame(width: 30, height: 30)
+            .glass(Circle(), interactive: true)
         }
         .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 10)
         .background(WindowDragArea())
@@ -112,28 +110,38 @@ struct RootView: View {
                     .onSubmit { if let first = Cities.search(query).first { add(first) } }
                     .onExitCommand { query = "" }
             }
-            .padding(.horizontal, 10).frame(height: 32)
-            .background(RoundedRectangle(cornerRadius: 8).stroke(Color.secondary.opacity(0.4)))
+            .padding(.horizontal, 12).frame(height: 32)
+            .glass(Capsule())
 
             DatePicker("", selection: Binding(
                 get: { store.homeDayForPicker },
                 set: { store.setDay($0) }
             ), displayedComponents: .date)
             .labelsHidden()
-            .datePickerStyle(.compact)
-            .frame(width: 110)
+            .datePickerStyle(.field)
+            .frame(width: 96)
+            .padding(.horizontal, 8).frame(height: 32)
+            .glass(Capsule())
 
-            Button { store.goNow() } label: {
-                Label("Now", systemImage: "arrow.counterclockwise")
-                    .font(.system(size: 13, weight: .semibold))
-                    .padding(.horizontal, 12).frame(height: 32)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(Palette.accent))
-                    .foregroundStyle(.white)
-            }
-            .buttonStyle(.plain)
-            .keyboardShortcut("n", modifiers: .command)
+            nowButton.keyboardShortcut("n", modifiers: .command)
         }
         .padding(.horizontal, 16).padding(.bottom, 12)
+    }
+
+    @ViewBuilder private var nowButton: some View {
+        let label = Label("Now", systemImage: "arrow.counterclockwise")
+            .font(.system(size: 13, weight: .semibold))
+            .padding(.horizontal, 4).frame(height: 24)
+        if #available(macOS 26, *) {
+            Button { store.goNow() } label: { label }
+                .buttonStyle(.glassProminent).tint(Palette.accent).controlSize(.large)
+        } else {
+            Button { store.goNow() } label: {
+                label.padding(.horizontal, 10).frame(height: 32)
+                    .background(Capsule().fill(Palette.accent)).foregroundStyle(.white)
+            }
+            .buttonStyle(.plain)
+        }
     }
 
     @ViewBuilder private var searchResults: some View {
@@ -202,7 +210,9 @@ struct RootView: View {
             Button { showBest = false } label: { Image(systemName: "xmark") }
                 .buttonStyle(.plain).foregroundStyle(.secondary)
         }
-        .padding(.horizontal, 16).padding(.vertical, 10)
+        .padding(.horizontal, 14).padding(.vertical, 10)
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Palette.accent.opacity(0.12)))
+        .padding(.horizontal, 10)
     }
 
     private var footer: some View {
@@ -257,16 +267,21 @@ struct PlaceRow: View {
                 store.setMinute(m, in: tz)
             }
         }
-        .padding(.horizontal, 16).padding(.vertical, 10)
+        .padding(.horizontal, 14).padding(.vertical, 10)
         .overlay(alignment: .topTrailing) {
             if hovering {
                 Button { store.remove(place.id) } label: {
                     Image(systemName: "xmark").font(.system(size: 9, weight: .bold))
                 }
-                .buttonStyle(.plain).foregroundStyle(.secondary).padding(6)
+                .buttonStyle(.plain).foregroundStyle(.secondary).padding(7)
             }
         }
-        .background(hovering ? Color.primary.opacity(0.03) : .clear)
+        // A frosted card inside the glass panel: light fill, hairline highlight on the edge
+        .background {
+            let card = RoundedRectangle(cornerRadius: 18, style: .continuous)
+            card.fill(Color.primary.opacity(hovering ? 0.07 : 0.04))
+                .overlay(card.strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5))
+        }
         .onHover { hovering = $0 }
         .contextMenu {
             if !isHome { Button("Make home zone (offsets relative to this)") { store.makeHome(place.id) } }
@@ -302,25 +317,27 @@ struct DayTrack: View {
         GeometryReader { geo in
             let w = geo.size.width
             let x = CGFloat(minute / 1440) * w
+            let ws = CGFloat(workStart) / 24 * w, we = CGFloat(workEnd) / 24 * w
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(LinearGradient(stops: stops, startPoint: .leading, endPoint: .trailing))
-                    .frame(height: 8)
-                // hour ticks every 6h
-                ForEach([6, 12, 18], id: \.self) { h in
-                    Rectangle().fill(Color.white.opacity(0.5))
-                        .frame(width: 1, height: 8)
-                        .offset(x: CGFloat(h) / 24 * w)
-                }
-                Circle()
-                    .fill(Color.white)
-                    .overlay(Circle().stroke(emphasized ? Palette.accent : Color.black.opacity(0.15),
-                                             lineWidth: emphasized ? 2.5 : 1))
-                    .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
-                    .frame(width: 22, height: 22)
-                    .offset(x: x - 11)
+                    .fill(LinearGradient(stops: Self.sky, startPoint: .leading, endPoint: .trailing))
+                    .frame(height: 12)
+                // working hours: a bright outline over that stretch of sky
+                Capsule()
+                    .strokeBorder(Color.white.opacity(0.5), lineWidth: 1)
+                    .frame(width: we - ws, height: 12)
+                    .offset(x: ws)
+                // glass knob with a sun or moon for that zone's local time
+                Image(systemName: isDaytime ? "sun.max.fill" : "moon.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(isDaytime ? Color.orange : Color.indigo)
+                    .frame(width: 28, height: 28)
+                    .glass(Circle(), interactive: true)
+                    .overlay(Circle().strokeBorder(Palette.accent, lineWidth: emphasized ? 1.5 : 0))
+                    .shadow(color: .black.opacity(0.18), radius: 3, y: 1)
+                    .offset(x: x - 14)
             }
-            .frame(height: 22)
+            .frame(height: 28)
             .frame(maxHeight: .infinity)
             .contentShape(Rectangle())
             .gesture(DragGesture(minimumDistance: 0).onChanged { v in
@@ -328,19 +345,40 @@ struct DayTrack: View {
                 onChange(Double(clamped / w) * 1440)
             })
         }
-        .frame(height: 24)
+        .frame(height: 30)
     }
 
-    private var stops: [Gradient.Stop] {
-        let s = Double(workStart) / 24, e = Double(workEnd) / 24, fade = 1.5 / 24
+    private var isDaytime: Bool { minute >= 6.5 * 60 && minute < 18.5 * 60 }
+
+    /// A day's sky from midnight to midnight: night, sunrise, morning blue, noon gold, dusk, night.
+    private static let sky: [Gradient.Stop] = {
+        func c(_ r: Double, _ g: Double, _ b: Double) -> Color { Color(red: r / 255, green: g / 255, blue: b / 255) }
+        let night = c(18, 36, 72)
         return [
-            .init(color: Palette.night, location: 0),
-            .init(color: Palette.night, location: max(s - fade, 0)),
-            .init(color: Palette.day, location: s),
-            .init(color: Palette.day, location: e),
-            .init(color: Palette.night, location: min(e + fade, 1)),
-            .init(color: Palette.night, location: 1),
+            .init(color: night, location: 0),
+            .init(color: night, location: 0.21),
+            .init(color: c(240, 153, 123), location: 0.27),   // sunrise
+            .init(color: c(133, 183, 235), location: 0.35),   // morning
+            .init(color: c(250, 199, 117), location: 0.52),   // noon
+            .init(color: c(133, 183, 235), location: 0.68),   // afternoon
+            .init(color: c(212, 83, 126), location: 0.77),    // dusk
+            .init(color: c(60, 52, 137), location: 0.82),
+            .init(color: night, location: 0.88),
+            .init(color: night, location: 1),
         ]
+    }()
+}
+
+extension View {
+    /// Liquid Glass on macOS 26 and later, a translucent material on older systems.
+    @ViewBuilder func glass<S: Shape>(_ shape: S, tint: Color? = nil, interactive: Bool = false) -> some View {
+        if #available(macOS 26, *) {
+            glassEffect(Glass.regular.tint(tint).interactive(interactive), in: shape)
+        } else if let tint {
+            background(tint, in: shape)
+        } else {
+            background(.ultraThinMaterial, in: shape)
+        }
     }
 }
 
@@ -367,8 +405,8 @@ struct TimestampBar: View {
                 .frame(width: 100)
                 .help("Zone to assume when the timestamp has none")
             }
-            .padding(.horizontal, 10).frame(height: 32)
-            .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.04)))
+            .padding(.horizontal, 12).frame(height: 32)
+            .glass(Capsule())
 
             if !status.isEmpty {
                 Text(status).font(.system(size: 11)).foregroundStyle(ok ? Color.secondary : Color.red)
@@ -401,10 +439,10 @@ func copy(_ s: String) {
 struct IconButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .frame(width: 30, height: 26)
-            .background(RoundedRectangle(cornerRadius: 7).stroke(Color.secondary.opacity(0.35)))
+            .frame(width: 30, height: 30)
+            .glass(Circle(), interactive: true)
             .opacity(configuration.isPressed ? 0.6 : 1)
-            .contentShape(Rectangle())
+            .contentShape(Circle())
     }
 }
 
