@@ -41,6 +41,12 @@ modeled on the Savvy Time web widget. Built for triaging and aligning timestamps
   (gitignored), wraps it in a .pkg signed with the Mac Installer Distribution cert. Upload via Transporter.
   Test the sandbox locally with `ENTITLEMENTS=Resources/TimeAlign.entitlements INSTALL=0 ./build.sh`.
 - `tools/make_icon.swift`: draws the icon, writes `Resources/AppIcon.icns` and a 1024px PNG.
+- `tools/make_screenshot.swift` + `AppStore/`: 2880x1800 App Store screenshots. Capture the panel by
+  launching the binary with argument-domain overrides (`-places.v1 <hex data> -use24h YES
+  -"NSWindow Frame TimeAlignPanel" "x y w h ..."`) so real settings are untouched, then
+  `screencapture -l <window id>`. Privacy policy: `PRIVACY.md` (linked from App Store Connect).
+- Gotcha: once `~/Library/Containers/com.vinay.timealign` exists (from running a sandboxed build),
+  `defaults read/write com.vinay.timealign` targets the container, not the plist the normal build uses.
 
 ## Reference behavior (Savvy Time)
 - Rows: name (bold), big local time on the right; subtitle "place | ABBR" and "UTC-7 | 7h behind | Wed, Oct 28".
