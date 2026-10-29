@@ -52,6 +52,10 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
+# Drop extended attributes (e.g. com.apple.quarantine on a downloaded provisioning profile):
+# productbuild packs them into the .pkg and App Store Connect rejects the upload (error 91109).
+xattr -cr "$APP"
+
 # Absolute path: conda and other toolchains ship their own incompatible codesign.
 if [[ -n "${SIGN_ID:-}" ]]; then
   /usr/bin/codesign --force --options runtime --timestamp --sign "$SIGN_ID" \
