@@ -23,6 +23,7 @@ Requires macOS 13 or later. Runs on Apple Silicon and Intel Macs.
 ```bash
 ./build.sh            # build, install to /Applications and launch
 ./release.sh 1.1      # universal, signed, notarized DMG in build/ (needs a Developer ID)
+./appstore.sh 1.1 2   # sandboxed Mac App Store .pkg (needs App Store certificates and profile)
 ```
 
 ## Credits

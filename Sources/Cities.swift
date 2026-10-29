@@ -66,15 +66,11 @@ enum Cities {
     /// Parse the list off the main thread at launch so the first keystroke doesn't stall.
     static func preload() { DispatchQueue.global(qos: .utility).async { _ = all.count } }
 
-    /// cities.tsv sits in the app's Resources; under `swift run` fall back to the source tree.
+    /// cities.tsv sits in the app's Resources (build.sh copies it). Only the bundle is read, so this
+    /// works inside the App Store sandbox; a bare `swift run` gets shorthands and zone names only.
     private static func loadWorldList() -> String {
-        let bundled = Bundle.main.url(forResource: "cities", withExtension: "tsv")
-        let source = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-            .deletingLastPathComponent().appendingPathComponent("Resources/cities.tsv")
-        for url in [bundled, source].compactMap({ $0 }) {
-            if let s = try? String(contentsOf: url, encoding: .utf8) { return s }
-        }
-        return ""
+        guard let url = Bundle.main.url(forResource: "cities", withExtension: "tsv") else { return "" }
+        return (try? String(contentsOf: url, encoding: .utf8)) ?? ""
     }
 
     static func search(_ q: String) -> [CityEntry] {

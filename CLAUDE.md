@@ -36,6 +36,11 @@ modeled on the Savvy Time web widget. Built for triaging and aligning timestamps
   copies to /Applications, opens it. Env switches VERSION, UNIVERSAL=1, SIGN_ID, INSTALL=0.
 - `release.sh <version>`: universal Developer ID build, DMG, notarize (keychain profile `TimeAlign`),
   staple. Publish with `gh release create v<version> build/TimeAlign-<version>.dmg`.
+- `appstore.sh <version> <build>`: sandboxed (`Resources/TimeAlign.entitlements` plus team/app ids)
+  universal build signed with Apple Distribution, embeds `Resources/TimeAlign_AppStore.provisionprofile`
+  (gitignored), wraps it in a .pkg signed with the Mac Installer Distribution cert. Upload via Transporter.
+  Test the sandbox locally with `ENTITLEMENTS=Resources/TimeAlign.entitlements INSTALL=0 ./build.sh`.
+- `tools/make_icon.swift`: draws the icon, writes `Resources/AppIcon.icns` and a 1024px PNG.
 
 ## Reference behavior (Savvy Time)
 - Rows: name (bold), big local time on the right; subtitle "place | ABBR" and "UTC-7 | 7h behind | Wed, Oct 28".
@@ -53,4 +58,3 @@ modeled on the Savvy Time web widget. Built for triaging and aligning timestamps
 ## Ideas not done yet
 - Launch at login via `SMAppService.mainApp.register()` toggle in the ... menu.
 - Drag-to-reorder rows (currently right-click Move up/down).
-- App icon (.icns).
