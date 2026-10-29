@@ -45,6 +45,13 @@ modeled on the Savvy Time web widget. Built for triaging and aligning timestamps
   launching the binary with argument-domain overrides (`-places.v1 <hex data> -use24h YES
   -"NSWindow Frame TimeAlignPanel" "x y w h ..."`) so real settings are untouched, then
   `screencapture -l <window id>`. Privacy policy: `PRIVACY.md` (linked from App Store Connect).
+  Since the Liquid Glass redesign (1.1) the panel shows what is behind it, so capture over a stage
+  instead: `make_screenshot.swift - out.png ...` renders the canvas without a panel,
+  `tools/backdrop.swift <image> x y w h` shows it in a window just above normal windows, the floating
+  panel goes on top (`NSWindow Frame` override), then `screencapture -R` the region and scale to
+  2880x1800 (flatten alpha). The App Preview is recorded the same way over the
+  `make_preview_assets.swift` bg.png, with the user doing the actions. Pick cities whose working hours
+  overlap after any city added on camera, or the Best time banner disappears.
 - Gotcha: once `~/Library/Containers/com.vinay.timealign` exists (from running a sandboxed build),
   `defaults read/write com.vinay.timealign` targets the container, not the plist the normal build uses.
 

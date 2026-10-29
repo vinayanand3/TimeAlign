@@ -1,11 +1,14 @@
 // Composes a 2880x1800 Mac App Store screenshot: headline and icon on the left, a captured
 // panel (screencapture -l <window>, with its shadow) on the right, on the icon's blue gradient.
 //   swift tools/make_screenshot.swift <panel.png> <out.png> "<headline>" "<subline>"
+// With "-" for the panel it leaves the right side empty: show that canvas with tools/backdrop.swift,
+// float the real (glass) panel over it, and capture the screen, so the glass picks up the gradient.
 import AppKit
 
 let args = CommandLine.arguments
-guard args.count == 5, let panel = NSImage(contentsOfFile: args[1]) else {
-    print("usage: make_screenshot.swift <panel.png> <out.png> <headline> <subline>"); exit(1)
+let panel = args.count == 5 && args[1] != "-" ? NSImage(contentsOfFile: args[1]) : nil
+guard args.count == 5, panel != nil || args[1] == "-" else {
+    print("usage: make_screenshot.swift <panel.png | -> <out.png> <headline> <subline>"); exit(1)
 }
 let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
 let icon = NSImage(contentsOf: root.appendingPathComponent("Resources/AppIcon-1024.png"))!
@@ -24,9 +27,11 @@ let navy = NSColor(red: 0.08, green: 0.16, blue: 0.33, alpha: 1)
 NSGradient(starting: accent, ending: navy)!.draw(in: NSRect(x: 0, y: 0, width: W, height: H), angle: -60)
 
 // Panel, pixel for pixel (captures are @2x), centered vertically on the right
-let px = panel.representations.first.map { NSSize(width: $0.pixelsWide, height: $0.pixelsHigh) } ?? panel.size
+// No panel: reserve the width a 500-point panel takes on a 1728-point screen showing this canvas.
+let px = panel.map { p in p.representations.first.map { NSSize(width: $0.pixelsWide, height: $0.pixelsHigh) } ?? p.size }
+    ?? NSSize(width: 834, height: 0)
 let pr = NSRect(x: CGFloat(W) - px.width - 170, y: (CGFloat(H) - px.height) / 2, width: px.width, height: px.height)
-panel.draw(in: pr)
+panel?.draw(in: pr)
 
 // Left column: icon, headline, subline
 let left: CGFloat = 230, colWidth = pr.minX - left - 120
