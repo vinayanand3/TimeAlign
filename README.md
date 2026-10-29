@@ -3,6 +3,8 @@
 A small macOS menu bar app with an always-on-top panel for comparing time zones and lining up
 timestamps across them.
 
+![TimeAlign's Liquid Glass panel](AppStore/screenshot-1.png)
+
 - Add any of ~34,000 cities, a zone abbreviation (PST, IST, BST) or an IANA zone (Europe/Lisbon).
 - Drag the day/night bar on any row and every row moves together.
 - "Best time" banner finds the overlap of everyone's working hours.
