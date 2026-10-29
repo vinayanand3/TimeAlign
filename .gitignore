@@ -6,3 +6,4 @@ build/
 *.provisionprofile
 *.cer
 *.certSigningRequest
+*.mp4
