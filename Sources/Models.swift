@@ -164,9 +164,11 @@ final class TimeStore: ObservableObject {
 
 enum Fmt {
     private static var cache: [String: DateFormatter] = [:]
+    private static let lock = NSLock()   // Services and tests can format off the main thread
 
     static func formatter(_ pattern: String, _ tz: TimeZone) -> DateFormatter {
         let key = pattern + "|" + tz.identifier
+        lock.lock(); defer { lock.unlock() }
         if let f = cache[key] { return f }
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
@@ -187,9 +189,13 @@ enum Fmt {
     }
 
     static func abbr(_ tz: TimeZone, _ d: Date) -> String {
-        if tz.identifier == "UTC" || tz.identifier == "GMT" { return tz.identifier }
+        // Foundation now reports TimeZone(identifier: "UTC") as "GMT"; it's the same zone, and UTC is what logs say.
+        if tz.identifier == "UTC" || tz.identifier == "GMT" { return "UTC" }
         return tz.abbreviation(for: d) ?? ""
     }
+
+    /// The zone's IANA name, with UTC spelled UTC.
+    static func zoneName(_ tz: TimeZone) -> String { tz.identifier == "GMT" ? "UTC" : tz.identifier }
 
     static func hm(_ secs: Int) -> String {
         let a = abs(secs)

@@ -16,6 +16,25 @@ struct RootView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
+            if panel.tab == .workbench {
+                WorkbenchView()
+            } else {
+                zones
+            }
+            footer
+        }
+        .frame(minWidth: 380, maxWidth: .infinity, maxHeight: .infinity)
+        .background(GeometryReader { g in Color.clear.onAppear { rootHeight = g.size.height }
+            .onChange(of: g.size.height) { rootHeight = $0 } })
+        .glass(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(alignment: .top) { if panel.tab == .zones { searchResults } }
+        .onChange(of: rowsHeight) { rows in
+            // Next runloop turn, so the root and viewport heights from this layout pass are in.
+            DispatchQueue.main.async { panel.rowsHeightChanged(rows, chrome: rootHeight - viewportHeight) }
+        }
+    }
+
+    @ViewBuilder private var zones: some View {
             controls
             if showBest { bestBanner }
             ScrollView(.vertical) {
@@ -33,17 +52,6 @@ struct RootView: View {
             .background(GeometryReader { g in Color.clear.onAppear { viewportHeight = g.size.height }
                 .onChange(of: g.size.height) { viewportHeight = $0 } })
             TimestampBar()
-            footer
-        }
-        .frame(minWidth: 380, maxWidth: .infinity, maxHeight: .infinity)
-        .background(GeometryReader { g in Color.clear.onAppear { rootHeight = g.size.height }
-            .onChange(of: g.size.height) { rootHeight = $0 } })
-        .glass(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay(alignment: .top) { searchResults }
-        .onChange(of: rowsHeight) { rows in
-            // Next runloop turn, so the root and viewport heights from this layout pass are in.
-            DispatchQueue.main.async { panel.rowsHeightChanged(rows, chrome: rootHeight - viewportHeight) }
-        }
     }
 
     @State private var rowsHeight: CGFloat = 0
@@ -58,7 +66,8 @@ struct RootView: View {
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(Palette.accent)
             Text("TimeAlign").font(.system(size: 16, weight: .semibold))
-            if !store.isLive {
+            TabSwitch(tab: $panel.tab).padding(.leading, 4)
+            if !store.isLive && panel.tab == .zones {
                 Text("scrubbing")
                     .font(.caption2.weight(.medium))
                     .padding(.horizontal, 6).padding(.vertical, 2)
@@ -217,12 +226,40 @@ struct RootView: View {
 
     private var footer: some View {
         HStack {
-            Text(store.places.map { $0.name }.joined(separator: " \u{00B7} "))
+            Text(panel.tab == .zones ? store.places.map { $0.name }.joined(separator: " \u{00B7} ")
+                 : "Times shown in \(store.places.first?.name ?? "UTC") (home)")
                 .font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
             Spacer()
             Text("\u{2325}\u{2318}T to show/hide").font(.system(size: 10)).foregroundStyle(.tertiary)
         }
         .padding(.horizontal, 16).padding(.vertical, 8)
+    }
+}
+
+/// Zones / Workbench, as a small glass capsule with the selected half filled in.
+struct TabSwitch: View {
+    @Binding var tab: PanelState.Tab
+    var body: some View {
+        HStack(spacing: 2) {
+            item(.zones, "Zones", "globe", "1")
+            item(.workbench, "Workbench", "wrench.and.screwdriver", "2")
+        }
+        .padding(2)
+        .glass(Capsule())
+    }
+
+    private func item(_ t: PanelState.Tab, _ title: String, _ icon: String, _ key: KeyEquivalent) -> some View {
+        Button { tab = t } label: {
+            Label(title, systemImage: icon)
+                .font(.system(size: 11, weight: .semibold))
+                .padding(.horizontal, 9).frame(height: 24)
+                .background(Capsule().fill(tab == t ? Palette.accent : Color.clear))
+                .foregroundStyle(tab == t ? Color.white : Color.primary)
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .keyboardShortcut(key, modifiers: .command)
+        .help("\(title) (\u{2318}\(String(key.character)))")
     }
 }
 
@@ -276,12 +313,7 @@ struct PlaceRow: View {
                 .buttonStyle(.plain).foregroundStyle(.secondary).padding(7)
             }
         }
-        // A frosted card inside the glass panel: light fill, hairline highlight on the edge
-        .background {
-            let card = RoundedRectangle(cornerRadius: 18, style: .continuous)
-            card.fill(Color.primary.opacity(hovering ? 0.07 : 0.04))
-                .overlay(card.strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5))
-        }
+        .card(hover: hovering)
         .onHover { hovering = $0 }
         .contextMenu {
             if !isHome { Button("Make home zone (offsets relative to this)") { store.makeHome(place.id) } }
@@ -386,6 +418,8 @@ extension View {
 
 struct TimestampBar: View {
     @EnvironmentObject var store: TimeStore
+    @EnvironmentObject var bench: Workbench
+    @EnvironmentObject var panel: PanelState
     @State private var text = ""
     @State private var status = ""
     @State private var ok = true
@@ -409,7 +443,17 @@ struct TimestampBar: View {
             .glass(Capsule())
 
             if !status.isEmpty {
-                Text(status).font(.system(size: 11)).foregroundStyle(ok ? Color.secondary : Color.red)
+                HStack(spacing: 6) {
+                    Text(status).font(.system(size: 11)).foregroundStyle(ok ? Color.secondary : Color.red)
+                    Button("Details") {
+                        bench.inspectText = text
+                        bench.inspectZoneID = assumeID
+                        bench.tool = .inspect
+                        panel.tab = .workbench
+                    }
+                    .buttonStyle(.plain).font(.system(size: 11, weight: .medium)).foregroundStyle(Palette.accent)
+                    .help("Format, warnings and copy-as in the Workbench")
+                }
             }
         }
         .padding(.horizontal, 16).padding(.top, 10)

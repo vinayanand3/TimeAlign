@@ -3,7 +3,11 @@ import AppKit
 import Carbon.HIToolbox
 
 final class PanelState: ObservableObject {
+    enum Tab: String { case zones, workbench }
     weak var panel: NSPanel?
+    @Published var tab: Tab = Tab(rawValue: UserDefaults.standard.string(forKey: "tab") ?? "") ?? .zones {
+        didSet { UserDefaults.standard.set(tab.rawValue, forKey: "tab") }
+    }
     @Published var pinned: Bool = (UserDefaults.standard.object(forKey: "pinned") as? Bool) ?? true {
         didSet {
             UserDefaults.standard.set(pinned, forKey: "pinned")
@@ -58,6 +62,7 @@ enum TimeAlignMain {
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     let store = TimeStore()
     let panelState = PanelState()
+    let workbench = Workbench()
     var panel: FloatingPanel!
     var statusItem: NSStatusItem!
     var hotKeyRef: EventHotKeyRef?
@@ -70,6 +75,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         buildPanel()
         buildStatusItem()
         registerHotKey()
+        NSApp.servicesProvider = self
+        NSUpdateDynamicServices()
+        showPanel()
+    }
+
+    // MARK: Workbench entry points (Services menu, Shortcuts)
+
+    func inspect(_ text: String) {
+        workbench.inspectText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        workbench.tool = .inspect
+        panelState.tab = .workbench
+        showPanel()
+    }
+
+    /// Services menu: "Inspect Timestamp in TimeAlign" (NSServices in build.sh's Info.plist).
+    @objc func inspectTimestamp(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
+        guard let s = pboard.string(forType: .string) else { return }
+        inspect(s)
+    }
+
+    /// Services menu: "Add Logs to TimeAlign Timeline". Lands in the paste box so the zone can be picked first.
+    @objc func addLogsToTimeline(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
+        guard let s = pboard.string(forType: .string) else { return }
+        workbench.draft = s
+        workbench.tool = .logs
+        panelState.tab = .workbench
         showPanel()
     }
 
@@ -95,7 +126,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func buildPanel() {
         let host = NSHostingController(rootView:
-            RootView().environmentObject(store).environmentObject(panelState))
+            RootView().environmentObject(store).environmentObject(panelState).environmentObject(workbench))
         host.sizingOptions = []   // the user sizes the panel; PanelState refits height when cities change
 
         panel = FloatingPanel(

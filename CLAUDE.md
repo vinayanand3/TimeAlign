@@ -1,7 +1,9 @@
 # TimeAlign: handoff notes
 
-Native macOS menu bar app with an always-on-top floating panel for comparing time zones,
-modeled on the Savvy Time web widget. Built for triaging and aligning timestamps across zones.
+Native macOS menu bar app with an always-on-top floating panel. Two tabs: Zones (comparing time zones,
+modeled on the Savvy Time web widget) and Workbench (developer tools for timestamps: Inspect, Logs, Cron).
+1.0 was rejected by App Review under 4.3 (spam: "another world clock"); 1.2 added the Workbench to
+make it a developer tool (category Developer Tools). Keep new features in that direction.
 
 ## Status
 - Builds cleanly (Swift 6.4, macOS 26) and `./build.sh` installs and launches /Applications/TimeAlign.app.
@@ -30,9 +32,25 @@ modeled on the Savvy Time web widget. Built for triaging and aligning timestamps
   then population. Pre-folded keys plus a `memmem` prefilter keep it ~3 ms per keystroke.
 - `Resources/cities.tsv`: GeoNames cities15000 (CC BY 4.0), trimmed by `tools/trim_geonames.py`;
   see `Resources/README.md`. `build.sh` copies it into the app's Resources.
-- `Sources/TimestampParser.swift`: ISO 8601, epoch s/ms, many human formats, trailing zone
-  abbreviations (PDT, IST...) or offsets (+05:30); falls back to a chosen zone; NSDataDetector last.
-- `build.sh`: release build, wraps binary in .app with Info.plist (LSUIElement), ad-hoc codesign,
+- `Sources/TimestampParser.swift`: ISO 8601, epoch s/ms/us/ns (by digit count), log, syslog and Apache
+  formats, zone abbreviations anywhere or trailing offsets; falls back to a chosen zone; NSDataDetector
+  last. `Result.format` and `.warnings` feed the Inspect tab (other epoch units, US day/month order,
+  ambiguous IST/CST/BST, local times a clock change skips or repeats; DateFormatter refuses skipped
+  times, so `skippedByClockChange` re-reads them leniently).
+- Workbench: `Inspector.swift` (combines the parser and `IDDecoder.swift`, ranks readings, copy-as
+  formats), `IDDecoder.swift` (UUID v1/v6/v7, ULID, Snowflake Discord/X, ObjectId), `LogTimeline.swift`
+  (regexes find each line's timestamp; lines without one attach to the previous event; time-only lines
+  move to the incident's day; Markdown/normalized export), `Cron.swift` (5 fields + @macros, Vixie
+  day-of-month OR day-of-week, next runs with spring-forward flag), `WorkbenchViews.swift` (UI and the
+  `Workbench` state object, owned by AppDelegate so tabs and Services keep pastes), `Intents.swift`
+  (Shortcuts actions). Tests in `Tests/WorkbenchTests.swift` (`swift test`).
+- Services menu (NSServices in build.sh's Info.plist, handlers `inspectTimestamp` / `addLogsToTimeline`
+  in AppDelegate). After installing, `/System/Library/CoreServices/pbs -update` refreshes the menu.
+- App Intents metadata: SwiftPM doesn't extract it, so build.sh typechecks with `-emit-const-values-path`
+  (protocol list in `tools/appintents_protocols.json`) and runs `xcrun appintentsmetadataprocessor`,
+  then copies `Metadata.appintents` into Resources. Without it Shortcuts doesn't see the actions.
+- Gotcha: `TimeZone(identifier: "UTC").identifier` is now "GMT"; `Fmt.abbr` / `Fmt.zoneName` print UTC.
+- `build.sh`: release build (default VERSION 1.2), wraps binary in .app with Info.plist (LSUIElement), ad-hoc codesign,
   copies to /Applications, opens it. Env switches VERSION, UNIVERSAL=1, SIGN_ID, INSTALL=0.
 - `release.sh <version>`: universal Developer ID build, DMG, notarize (keychain profile `TimeAlign`),
   staple. Publish with `gh release create v<version> build/TimeAlign-<version>.dmg`.
